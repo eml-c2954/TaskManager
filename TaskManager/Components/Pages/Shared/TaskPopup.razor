@@ -1,0 +1,81 @@
+﻿@using Microsoft.AspNetCore.Identity
+@using TaskManager.Common.Enums
+@using TaskManager.Data
+@using TaskManager.Service.Dtos
+@using TaskManager.Service.Interfaces
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITaskService _taskService
+@inject IUserService _userService
+
+<EditForm Model="selectedTask" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <input id="id" type="hidden" @bind="selectedTask.Id" />
+    <div class="form-group">
+        <label for="title">Title</label>
+        <InputText id="title" class="form-control" required @bind-Value="selectedTask.Title" />
+    </div>
+    <div class="form-group">
+        <label for="description">Description</label>
+        <InputTextArea id="description" class="form-control" @bind-Value="selectedTask.Description" />
+        <ValidationMessage For="@(() => selectedTask.Description)" />
+    </div>
+    @if (isAdmin)
+    {
+        <div class="form-group">
+            <label for="assignedUser">Assign to User</label>
+            <select id="assignedUser" class="form-control" @bind="selectedTask.Assignee.Id">
+                <option value="">Select a user</option>
+                @foreach (var user in users)
+                {
+                    <option value="@user.Id" selected="@((selectedTask.Assignee != null && selectedTask.Assignee.Id == user.Id) ? "selected" : null)">
+                        @user.UserName
+                    </option>
+                }
+            </select>
+        </div>
+    } else
+    {
+        <div class="form-group">
+            <label for="assignedUser">Assign to User</label>
+            <input id="assignedUser" type="hidden" @bind="selectedTask.Assignee.Id" />
+            <input type="text" class="form-control" readonly value="@selectedTask.Assignee.UserName"/>
+        </div>
+    }
+    <!--Progress-->
+    <div class="form-group">
+        <label for="status">Progress</label>
+        <select id="status" class="form-control" @bind="selectedTask.Status">
+            @foreach (var status in Enum.GetValues(typeof(TaskStatusEnum)))
+            {
+                <option value="@status" selected="@(selectedTask.Status == (TaskStatusEnum)status)">@status</option>
+            }
+        </select>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public required TaskDto selectedTask { get; set; }
+    [Parameter] public EventCallback<TaskDto> OnSave { get; set; }
+    private ApplicationUser? CurrentUser { get; set; }
+    private bool isAdmin = false;
+    private List<UserDto>? users = new List<UserDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        CurrentUser = await UserManager.GetUserAsync(user);
+        if(CurrentUser != null)
+        {
+            isAdmin = await UserManager.IsInRoleAsync(CurrentUser, "Admin");
+        }
+
+        users = await _userService.GetUsers();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        await OnSave.InvokeAsync(selectedTask);
+    }
+}

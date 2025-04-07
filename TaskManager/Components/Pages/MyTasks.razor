@@ -1,0 +1,146 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@using TaskManager.Common.Enums
+@using TaskManager.Components.Pages.Shared
+@using TaskManager.Service.Dtos
+@using TaskManager.Service.Interfaces
+@page "/my-tasks"
+@attribute [Authorize]
+@attribute [StreamRendering]
+@inject ITaskService _taskService
+
+<h3>My Tasks</h3>
+
+<div class="page-container">
+    <div class="row">
+        <div class="col-xl-6">
+            <div class="card">
+                <div class="card-header border-bottom border-dashed d-flex align-items-center">
+                    <h4 class="header-title">Task list</h4>
+                </div>
+
+                <div class="card-body">
+                    <div class="table-responsive-sm">
+                        <table class="table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Description</th>
+                                    <th>Assignee</th>
+                                    <th>Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (tasks.Any())
+                                {
+                                    @foreach (var task in tasks)
+                                    {
+                                        <tr>
+                                            <td><a href="javascript:void(0)" @onclick="((args) => OpenTaskPopup(args, task.Id))">@task.Title</a></td>
+                                            <td>@task.Description</td>
+                                            <td>@(string.IsNullOrEmpty(task.Assignee?.UserName) ? "Unassigned" : task.Assignee.UserName)</td>
+                                            <td>
+                                                @(Enum.GetName(typeof(TaskStatusEnum), task.Status))
+                                            </td>
+                                        </tr>
+                                    }
+                                } else
+                                {
+                                    if(isLoading)
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center">Loading...</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="4">No tasks found.</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div> <!-- end table-responsive-->
+                </div> <!-- end card body-->
+            </div> <!-- end card -->
+        </div><!-- end col-->
+        <br />
+        <div class="d-grid gap-2 d-md-flex justify-content-md-start mt-2">
+            <Button Color="ButtonColor.Primary" @onclick="((args) => OpenTaskPopup(args, null))"> New Task </Button>
+        </div>
+    </div>
+</div>
+
+<Modal @ref="modal" Title="Edit User">
+    <BodyTemplate>
+        <DynamicComponent Type="typeof(TaskPopup)" Parameters="componentParams" />
+    </BodyTemplate>
+    <FooterTemplate>
+        <Button Color="ButtonColor.Secondary" @onclick="CloseModal">Close</Button>
+        <Button Color="ButtonColor.Primary" @onclick="() => SaveTask(selectedTask)">Save</Button>
+    </FooterTemplate>
+</Modal>
+
+@code {
+    private Modal modal = default!;
+    private IEnumerable<TaskDto> tasks = [];
+    private Dictionary<string, object>? componentParams;
+
+    bool isLoading = true;
+
+    private TaskDto selectedTask = initEmptyTask();
+
+    protected override async Task OnInitializedAsync()
+    {
+        tasks = await _taskService.GetPersonalTasks();
+        isLoading = false;
+    }
+
+    private async Task OpenTaskPopup(EventArgs args, Guid? taskId)
+    {
+        if (taskId != null)
+        {
+            selectedTask = await _taskService.GetTaskDetailsAsync(taskId.Value);
+        }
+
+        componentParams = new Dictionary<string, object>
+        {
+            { "selectedTask", selectedTask },
+            { "OnSave", EventCallback.Factory.Create<TaskDto>(this, SaveTask) }
+        };
+        await modal.ShowAsync();
+    }
+
+    private async Task CloseModal()
+    {
+        await modal.HideAsync();
+    }
+
+    private async Task SaveTask(TaskDto task)
+    {
+        if (task.Id == null)
+        {
+            await _taskService.CreateTaskAsync(task);
+        }
+        else
+        {
+            await _taskService.UpdateTaskAsync(task);
+        }
+        selectedTask = initEmptyTask();
+        tasks = await _taskService.GetPersonalTasks();
+        await modal.HideAsync();
+    }
+
+    private static TaskDto initEmptyTask()
+    {
+        return new TaskDto()
+        {
+            Title = string.Empty,
+            Status = TaskStatusEnum.Pending,
+            Assignee = new UserDto() {
+                Email = string.Empty,
+                UserName = string.Empty
+            }
+        };
+    }
+}
