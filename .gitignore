@@ -1,0 +1,5 @@
+TaskManager.Data/obj/
+TaskManager/obj/
+.vs/
+TaskManager.Common/obj/
+TaskManager.Service/obj/
