@@ -3,3 +3,7 @@ TaskManager/obj/
 .vs/
 TaskManager.Common/obj/
 TaskManager.Service/obj/
+TaskManager.Data/bin/
+TaskManager.Service/bin/
+TaskManager/bin/
+TaskManager.Common/bin/
